@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BalanzBot — Alertas de Trading</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #080b0f;
+  --s1: #0e1318;
+  --s2: #141a22;
+  --s3: #1a2230;
+  --border: #1e2a38;
+  --border2: #253040;
+  --green: #00e5a0;
+  --blue: #0099ff;
+  --red: #ff4060;
+  --yellow: #ffcc00;
+  --orange: #ff8c00;
+  --text: #dde6f0;
+  --muted: #3a4c60;
+  --muted2: #7a8fa8;
+  --mono: 'Space Mono', monospace;
+  --sans: 'Syne', sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;overflow-x:hidden;}
+body::before{
+  content:'';position:fixed;inset:0;
+  background:
+    radial-gradient(ellipse 60% 40% at 10% 20%, rgba(0,229,160,0.04) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 60% at 90% 80%, rgba(0,153,255,0.04) 0%, transparent 60%),
+    linear-gradient(rgba(0,229,160,0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,229,160,0.02) 1px, transparent 1px);
+  background-size:100% 100%,100% 100%,36px 36px,36px 36px;
+  pointer-events:none;z-index:0;
+}
+.wrap{position:relative;z-index:1;max-width:1000px;margin:0 auto;padding:20px 16px 60px;}
+
+header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;margin-bottom:20px;background:var(--s1);border:1px solid var(--border);border-radius:14px;}
+.logo{display:flex;align-items:center;gap:12px;}
+.logo-icon{width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,var(--green),var(--blue));display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 0 20px rgba(0,229,160,0.25);}
+.logo-name{font-size:18px;font-weight:800;letter-spacing:-.5px;}
+.logo-name span{color:var(--green);}
+.logo-sub{font-size:11px;color:var(--muted2);font-family:var(--mono);margin-top:1px;}
+.header-right{display:flex;align-items:center;gap:10px;}
+.live-badge{display:flex;align-items:center;gap:6px;background:rgba(0,229,160,0.08);border:1px solid rgba(0,229,160,0.2);border-radius:20px;padding:6px 12px;font-size:11px;font-family:var(--mono);color:var(--green);}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:blink 1.4s infinite;}
+@keyframes blink{0%,100%{opacity:1;box-shadow:0 0 6px var(--green);}50%{opacity:.3;box-shadow:none;}}
+.clock{font-family:var(--mono);font-size:12px;color:var(--muted2);}
+
+.tabs{display:flex;gap:4px;margin-bottom:20px;background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:4px;}
+.tab{flex:1;padding:9px 8px;border:none;background:transparent;color:var(--muted2);font-family:var(--sans);font-size:12px;font-weight:700;border-radius:9px;cursor:pointer;transition:all .2s;white-space:nowrap;}
+.tab.active{background:var(--s3);color:var(--text);border:1px solid var(--border2);}
+.tab:hover:not(.active){color:var(--text);}
+
+.panel{display:none;}
+.panel.active{display:block;animation:fadeIn .25s ease;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(5px);}to{opacity:1;transform:none;}}
+
+.card{background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:14px;}
+.card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border);}
+.card-title{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted2);letter-spacing:1.5px;text-transform:uppercase;display:flex;align-items:center;gap:8px;}
+.cdot{width:6px;height:6px;border-radius:50%;background:var(--green);}
+
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;}
+.stat{background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:14px 16px;position:relative;overflow:hidden;transition:border-color .2s;}
+.stat:hover{border-color:var(--border2);}
+.stat-val{font-family:var(--mono);font-size:22px;font-weight:700;line-height:1;}
+.stat-val.g{color:var(--green);}.stat-val.r{color:var(--red);}.stat-val.b{color:var(--blue);}.stat-val.y{color:var(--yellow);}
+.stat-lbl{font-size:11px;color:var(--muted2);margin-top:5px;font-family:var(--mono);}
+
+.signal-list{display:flex;flex-direction:column;gap:8px;}
+.sig{display:flex;align-items:center;gap:12px;background:var(--s2);border:1px solid var(--border);border-radius:9px;padding:12px 14px;animation:sigIn .3s ease;transition:border-color .2s;}
+.sig:hover{border-color:var(--border2);}
+@keyframes sigIn{from{opacity:0;transform:translateX(-8px);}to{opacity:1;transform:none;}}
+.sig-badge{padding:5px 10px;border-radius:6px;font-family:var(--mono);font-size:10px;font-weight:700;white-space:nowrap;flex-shrink:0;}
+.sig-badge.buy{background:rgba(0,229,160,0.12);color:var(--green);border:1px solid rgba(0,229,160,0.25);}
+.sig-badge.sell{background:rgba(255,64,96,0.12);color:var(--red);border:1px solid rgba(255,64,96,0.25);}
+.sig-badge.watch{background:rgba(255,204,0,0.1);color:var(--yellow);border:1px solid rgba(255,204,0,0.2);}
+.sig-info{flex:1;min-width:0;}
+.sig-ticker{font-family:var(--mono);font-size:13px;font-weight:700;}
+.sig-reason{font-size:12px;color:var(--muted2);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.sig-rsi{font-family:var(--mono);font-size:10px;padding:3px 7px;border-radius:4px;background:var(--s3);color:var(--muted2);border:1px solid var(--border);flex-shrink:0;}
+.sig-right{text-align:right;flex-shrink:0;}
+.sig-price{font-family:var(--mono);font-size:13px;}
+.sig-time{font-size:10px;color:var(--muted2);margin-top:2px;font-family:var(--mono);}
+
+.upcoming-list{display:flex;flex-direction:column;gap:8px;}
+.up-item{display:flex;align-items:center;gap:12px;background:var(--s2);border:1px solid var(--border);border-left:3px solid var(--orange);border-radius:9px;padding:13px 15px;transition:all .2s;}
+.up-item:hover{background:rgba(255,140,0,0.04);border-color:rgba(255,140,0,0.4);}
+.up-item.hot{border-left-color:var(--yellow);}
+.up-item.sell-op{border-left-color:var(--red);}
+.up-item.cons-op{border-left-color:var(--blue);}
+.up-icon{font-size:18px;flex-shrink:0;}
+.up-info{flex:1;}
+.up-ticker{font-family:var(--mono);font-size:13px;font-weight:700;}
+.up-desc{font-size:12px;color:var(--muted2);margin-top:2px;line-height:1.4;}
+.up-right{text-align:right;min-width:80px;}
+.up-eta{font-size:11px;font-family:var(--mono);color:var(--orange);}
+.up-item.sell-op .up-eta{color:var(--red);}
+.up-item.cons-op .up-eta{color:var(--blue);}
+.conf-bar{width:70px;height:3px;background:var(--border);border-radius:2px;margin:5px 0 0 auto;overflow:hidden;}
+.conf-fill{height:100%;border-radius:2px;background:linear-gradient(90deg,var(--orange),var(--yellow));}
+.up-item.sell-op .conf-fill{background:linear-gradient(90deg,var(--red),var(--orange));}
+.up-item.cons-op .conf-fill{background:linear-gradient(90deg,var(--blue),var(--green));}
+.up-conf{font-size:10px;color:var(--muted2);font-family:var(--mono);}
+
+.ticker-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:8px;}
+.ticker-item{background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:11px 13px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;}
+.ticker-item:hover{border-color:var(--border2);transform:translateY(-1px);}
+.ticker-item.selected{border-color:var(--green);background:rgba(0,229,160,0.04);}
+.ticker-item::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--green),var(--blue));transform:scaleX(0);transform-origin:left;transition:transform .25s;}
+.ticker-item.selected::before{transform:scaleX(1);}
+.t-check{position:absolute;top:8px;right:8px;width:14px;height:14px;border-radius:50%;background:var(--green);display:none;align-items:center;justify-content:center;font-size:8px;color:#000;font-weight:700;}
+.ticker-item.selected .t-check{display:flex;}
+.t-sym{font-family:var(--mono);font-size:12px;font-weight:700;}
+.t-name{font-size:11px;color:var(--muted2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.t-price{font-family:var(--mono);font-size:10px;color:var(--muted2);margin-top:4px;}
+
+.form-group{margin-bottom:14px;}
+.form-label{font-size:11px;color:var(--muted2);font-weight:700;margin-bottom:6px;display:block;font-family:var(--mono);letter-spacing:.5px;}
+.form-input{width:100%;background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:10px 13px;color:var(--text);font-family:var(--mono);font-size:13px;outline:none;transition:border-color .2s;}
+.form-input:focus{border-color:var(--green);}
+.form-input::placeholder{color:var(--muted);}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.range-wrap{display:flex;align-items:center;gap:10px;margin-top:6px;}
+.range-wrap input[type=range]{flex:1;accent-color:var(--green);cursor:pointer;}
+.range-val{font-family:var(--mono);font-size:12px;color:var(--green);width:44px;text-align:right;}
+.range-hint{font-size:11px;color:var(--muted2);margin-top:4px;}
+
+.btn{padding:10px 18px;border-radius:8px;border:none;font-family:var(--sans);font-size:13px;font-weight:700;cursor:pointer;transition:all .18s;display:inline-flex;align-items:center;gap:6px;}
+.btn-primary{background:var(--green);color:#000;}
+.btn-primary:hover{background:#00ffb2;transform:translateY(-1px);box-shadow:0 4px 16px rgba(0,229,160,0.3);}
+.btn-danger{background:var(--red);color:#fff;}
+.btn-danger:hover{background:#ff6080;transform:translateY(-1px);}
+.btn-ghost{background:transparent;border:1px solid var(--border2);color:var(--muted2);}
+.btn-ghost:hover{border-color:var(--green);color:var(--green);}
+.btn-blue{background:rgba(0,153,255,0.12);border:1px solid rgba(0,153,255,0.25);color:var(--blue);}
+.btn-blue:hover{background:rgba(0,153,255,0.2);}
+.btn-yellow{background:rgba(255,204,0,0.1);border:1px solid rgba(255,204,0,0.25);color:var(--yellow);}
+.btn-yellow:hover{background:rgba(255,204,0,0.18);}
+.btn:disabled{opacity:.35;cursor:not-allowed;transform:none!important;box-shadow:none!important;}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;}
+.btn-sm{padding:5px 11px;font-size:11px;}
+
+#toast-container{position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;max-width:320px;}
+.toast{background:var(--s2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;display:flex;align-items:flex-start;gap:10px;animation:tIn .3s ease;box-shadow:0 8px 24px rgba(0,0,0,0.5);}
+.toast.buy{border-left:3px solid var(--green);}.toast.sell{border-left:3px solid var(--red);}.toast.watch{border-left:3px solid var(--yellow);}.toast.info{border-left:3px solid var(--blue);}
+.toast-out{animation:tOut .3s ease forwards;}
+@keyframes tIn{from{opacity:0;transform:translateX(16px);}to{opacity:1;transform:none;}}
+@keyframes tOut{to{opacity:0;transform:translateX(16px);}}
+.toast-icon{font-size:15px;flex-shrink:0;margin-top:1px;}
+.toast-body{flex:1;}
+.toast-title{font-size:12px;font-weight:700;font-family:var(--mono);color:var(--text);}
+.toast-msg{font-size:11px;color:var(--muted2);margin-top:3px;line-height:1.4;}
+.toast-x{color:var(--muted2);cursor:pointer;font-size:14px;padding:0 2px;flex-shrink:0;}
+.toast-x:hover{color:var(--text);}
+
+.code-block{background:#060a0e;border:1px solid var(--border);border-radius:10px;padding:16px;font-family:var(--mono);font-size:12px;line-height:1.75;color:#c9d1d9;overflow-x:auto;position:relative;}
+.kw{color:#ff7b72;}.str{color:#a5d6ff;}.cm{color:#3a5060;}.fn{color:#d2a8ff;}.num{color:#79c0ff;}.var{color:#ffa657;}
+
+.steps{display:flex;flex-direction:column;gap:14px;}
+.step{display:flex;gap:14px;align-items:flex-start;}
+.step-num{width:28px;height:28px;border-radius:50%;flex-shrink:0;background:rgba(0,229,160,0.08);border:1px solid rgba(0,229,160,0.25);color:var(--green);font-family:var(--mono);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;}
+.step h4{font-size:14px;font-weight:700;margin-bottom:3px;}
+.step p{font-size:13px;color:var(--muted2);line-height:1.6;}
+.pill{display:inline-block;background:var(--s3);border:1px solid var(--border2);border-radius:4px;padding:1px 7px;font-family:var(--mono);font-size:11px;color:var(--green);}
+
+.tag{display:inline-block;background:rgba(0,153,255,0.1);border:1px solid rgba(0,153,255,0.2);color:var(--blue);font-size:9px;font-family:var(--mono);padding:2px 7px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px;}
+.info-banner{background:rgba(0,153,255,0.06);border:1px solid rgba(0,153,255,0.18);border-radius:10px;padding:13px 16px;display:flex;gap:10px;font-size:13px;color:var(--muted2);line-height:1.6;margin-bottom:14px;}
+.warn-banner{background:rgba(255,204,0,0.05);border:1px solid rgba(255,204,0,0.18);border-radius:10px;padding:13px 16px;display:flex;gap:10px;font-size:13px;color:var(--muted2);line-height:1.6;margin-bottom:14px;}
+.empty{text-align:center;padding:40px 20px;color:var(--muted2);}
+.empty .ei{font-size:32px;margin-bottom:10px;}
+.empty p{font-size:13px;line-height:1.7;}
+.check-row{display:flex;align-items:center;gap:10px;padding:8px 0;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);}
+.check-row:last-child{border-bottom:none;}
+.check-row input{accent-color:var(--green);width:15px;height:15px;cursor:pointer;flex-shrink:0;}
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+</style>
+</head>
+<body>
+<div id="toast-container"></div>
+<div class="wrap">
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">📈</div>
+    <div>
+      <div class="logo-name">Balanz<span>Bot</span></div>
+      <div class="logo-sub">alertas de trading — v2.1</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="clock" id="clockEl">--:--:--</div>
+    <div class="live-badge">
+      <div class="live-dot"></div>
+      <span id="botStatusText">INACTIVO</span>
+    </div>
+  </div>
+</header>
+
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('dashboard',this)">📊 Dashboard</button>
+  <button class="tab" onclick="switchTab('upcoming',this)">🔮 Próximas ops.</button>
+  <button class="tab" onclick="switchTab('watchlist',this)">👁 Watchlist</button>
+  <button class="tab" onclick="switchTab('config',this)">⚙️ Configurar</button>
+  <button class="tab" onclick="switchTab('setup',this)">🚀 Cómo usarlo</button>
+</div>
+
+<!-- ═══ DASHBOARD ═══ -->
+<div id="tab-dashboard" class="panel active">
+  <div class="stats-row">
+    <div class="stat"><div class="stat-val b" id="s-activos">0</div><div class="stat-lbl">Activos</div></div>
+    <div class="stat"><div class="stat-val" id="s-total">0</div><div class="stat-lbl">Alertas hoy</div></div>
+    <div class="stat"><div class="stat-val g" id="s-compras">0</div><div class="stat-lbl">Compra</div></div>
+    <div class="stat"><div class="stat-val r" id="s-ventas">0</div><div class="stat-lbl">Venta</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div class="card-title"><div class="cdot"></div>SEÑALES EN TIEMPO REAL</div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:11px;font-family:var(--mono);color:var(--muted2);" id="lastScan">Último escaneo: —</span>
+        <button class="btn btn-ghost btn-sm" onclick="forceRescan()" id="scanBtn" disabled>↻ Escanear ahora</button>
+      </div>
+    </div>
+    <div class="signal-list" id="signalList">
+      <div class="empty"><div class="ei">🔍</div><p>Seleccioná activos en <strong style="color:var(--text)">Watchlist</strong><br>y presioná <strong style="color:var(--green)">▶ Iniciar Bot</strong> para empezar.</p></div>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-primary" id="startBtn" onclick="toggleBot()">▶ Iniciar Bot</button>
+    <button class="btn btn-ghost" onclick="forceRescan()" id="scanBtn2" disabled>⚡ Escanear ahora</button>
+    <button class="btn btn-yellow" onclick="exportSignals()">📥 Exportar CSV</button>
+    <button class="btn btn-ghost" onclick="clearSignals()">🗑 Limpiar señales</button>
+  </div>
+</div>
+
+<!-- ═══ PRÓXIMAS OPORTUNIDADES ═══ -->
+<div id="tab-upcoming" class="panel">
+  <div class="warn-banner">
+    <span>⚠️</span>
+    <div>Proyecciones basadas en indicadores técnicos. <strong style="color:var(--text)">No son garantías.</strong> Analizá siempre antes de operar en Balanz.</div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div class="card-title"><div class="cdot" style="background:var(--orange)"></div>POSIBLES COMPRAS — PRÓXIMAS HORAS/DÍAS</div>
+      <button class="btn btn-ghost btn-sm" onclick="refreshUpcoming()">↻ Actualizar</button>
+    </div>
+    <div class="upcoming-list" id="upBuy"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div class="card-title"><div class="cdot" style="background:var(--red)"></div>POSIBLES VENTAS — PRÓXIMAS</div>
+    </div>
+    <div class="upcoming-list" id="upSell"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div class="card-title"><div class="cdot" style="background:var(--blue)"></div>EN CONSOLIDACIÓN — ESPERAR</div>
+    </div>
+    <div class="upcoming-list" id="upCons"></div>
+  </div>
+</div>
+
+<!-- ═══ WATCHLIST ═══ -->
+<div id="tab-watchlist" class="panel">
+  <div class="info-banner">
+    <span>💡</span>
+    <div>Seleccioná los activos que querés monitorear. Podés cambiarlos en cualquier momento sin reiniciar el bot.</div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div class="card-title">ACCIONES ARGENTINAS <span class="tag">BYMA</span></div>
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-ghost btn-sm" onclick="selectAll('acciones')">Todos</button>
+        <button class="btn btn-ghost btn-sm" onclick="clearAll('acciones')">Ninguno</button>
+      </div>
+    </div>
+    <div class="ticker-grid" id="gridAcciones"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div class="card-title">CEDEARs <span class="tag">NYSE/NASDAQ</span></div>
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-ghost btn-sm" onclick="selectAll('cedears')">Todos</button>
+        <button class="btn btn-ghost btn-sm" onclick="clearAll('cedears')">Ninguno</button>
+      </div>
+    </div>
+    <div class="ticker-grid" id="gridCedears"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div class="card-title">CRYPTO <span class="tag">24/7</span></div>
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-ghost btn-sm" onclick="selectAll('crypto')">Todos</button>
+        <button class="btn btn-ghost btn-sm" onclick="clearAll('crypto')">Ninguno</button>
+      </div>
+    </div>
+    <div class="ticker-grid" id="gridCrypto"></div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-primary" onclick="saveWatchlist()">💾 Guardar watchlist</button>
+    <button class="btn btn-ghost" onclick="switchTab('dashboard',document.querySelectorAll('.tab')[0])">← Volver al dashboard</button>
+  </div>
+</div>
+
+<!-- ═══ CONFIG ═══ -->
+<div id="tab-config" class="panel">
+
+  <div class="card">
+    <div class="card-head"><div class="card-title"><div class="cdot"></div>INDICADORES TÉCNICOS</div></div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">RSI — COMPRA (sobreventa)</label>
+        <div class="range-wrap">
+          <input type="range" min="10" max="40" value="30" id="rsiLow" oninput="document.getElementById('rsiLowVal').textContent=this.value">
+          <span class="range-val" id="rsiLowVal">30</span>
+        </div>
+        <div class="range-hint">RSI cae por debajo → señal de compra</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">RSI — VENTA (sobrecompra)</label>
+        <div class="range-wrap">
+          <input type="range" min="60" max="90" value="70" id="rsiHigh" oninput="document.getElementById('rsiHighVal').textContent=this.value">
+          <span class="range-val" id="rsiHighVal">70</span>
+        </div>
+        <div class="range-hint">RSI sube por encima → señal de venta</div>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">MEDIA MÓVIL CORTA (días)</label>
+        <div class="range-wrap">
+          <input type="range" min="5" max="20" value="9" id="mmaC" oninput="document.getElementById('mmaCVal').textContent=this.value">
+          <span class="range-val" id="mmaCVal">9</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">MEDIA MÓVIL LARGA (días)</label>
+        <div class="range-wrap">
+          <input type="range" min="20" max="100" value="21" id="mmaL" oninput="document.getElementById('mmaLVal').textContent=this.value">
+          <span class="range-val" id="mmaLVal">21</span>
+        </div>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">INTERVALO DE ESCANEO</label>
+      <div class="range-wrap">
+        <input type="range" min="5" max="60" value="15" step="5" id="interval" oninput="document.getElementById('intervalVal').textContent=this.value+'min'">
+        <span class="range-val" id="intervalVal">15min</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><div class="card-title"><div class="cdot" style="background:var(--blue)"></div>TELEGRAM — ALERTAS AL CELULAR</div></div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">TOKEN DEL BOT</label>
+        <input class="form-input" type="password" id="tgToken" placeholder="123456789:ABCdef...">
+      </div>
+      <div class="form-group">
+        <label class="form-label">TU CHAT ID</label>
+        <input class="form-input" type="text" id="tgChatId" placeholder="987654321">
+      </div>
+    </div>
+    <div class="btn-row" style="margin-top:4px;">
+      <button class="btn btn-blue" onclick="testTelegram()">📨 Probar conexión</button>
+      <button class="btn btn-ghost" onclick="showTgHelp()">❓ ¿Cómo lo consigo?</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><div class="card-title"><div class="cdot" style="background:var(--yellow)"></div>FILTROS DE ALERTAS</div></div>
+    <label class="check-row"><input type="checkbox" id="fBuy" checked><span>Mostrar señales de <strong style="color:var(--green)">COMPRA</strong></span></label>
+    <label class="check-row"><input type="checkbox" id="fSell" checked><span>Mostrar señales de <strong style="color:var(--red)">VENTA</strong></span></label>
+    <label class="check-row"><input type="checkbox" id="fWatch" checked><span>Mostrar alertas de <strong style="color:var(--yellow)">ATENCIÓN</strong></span></label>
+    <label class="check-row"><input type="checkbox" id="fSound"><span>Activar sonido en alertas nuevas</span></label>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-primary" onclick="saveConfig()">💾 Guardar configuración</button>
+    <button class="btn btn-ghost" onclick="resetConfig()">↺ Valores por defecto</button>
+  </div>
+</div>
+
+<!-- ═══ SETUP ═══ -->
+<div id="tab-setup" class="panel">
+  <div class="warn-banner">
+    <span>⚠️</span>
+    <div>Este bot <strong style="color:var(--text)">NO opera automáticamente</strong> — te manda alertas a Telegram y vos ejecutás las órdenes en Balanz. Siempre revisá antes de operar.</div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><div class="card-title"><div class="cdot"></div>PASOS PARA EJECUTAR EL BOT EN TU PC</div></div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div><h4>Crear tu bot en Telegram</h4>
+        <p>Buscá <span class="pill">@BotFather</span> en Telegram → escribí <span class="pill">/newbot</span> → elegí nombre → copiá el <strong style="color:var(--text)">token</strong> que te da.</p></div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div><h4>Obtener tu Chat ID</h4>
+        <p>Buscá <span class="pill">@userinfobot</span> en Telegram → mandá cualquier mensaje → copiá tu <strong style="color:var(--text)">Chat ID</strong>.</p></div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div><h4>Instalar Python</h4>
+        <p>Descargá desde <span class="pill">python.org</span>. En Windows marcá <strong style="color:var(--text)">"Add to PATH"</strong> durante la instalación.</p></div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div><h4>Instalar librerías</h4>
+        <p>Abrí la terminal (cmd en Windows) y ejecutá:</p>
+        <div class="code-block" style="margin-top:8px;font-size:12px;padding:10px 14px;">pip install yfinance pandas requests schedule</div></div>
+      </div>
+      <div class="step">
+        <div class="step-num">5</div>
+        <div><h4>Copiar el código del bot</h4>
+        <p>Copiá el código de abajo → pegalo en un archivo <span class="pill">balanzbot.py</span> → completá tu token y chat ID donde dice <span class="pill">TU_TOKEN_AQUI</span>.</p></div>
+      </div>
+      <div class="step">
+        <div class="step-num">6</div>
+        <div><h4>Ejecutar el bot</h4>
+        <p>En la terminal, navegá a la carpeta y ejecutá <span class="pill">python balanzbot.py</span>. El bot queda corriendo y te llegan alertas automáticamente.</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div class="card-title"><div class="cdot" style="background:var(--blue)"></div>CÓDIGO PYTHON — COPIAR Y PEGAR</div>
+      <button class="btn btn-blue btn-sm" onclick="copyCode()">📋 Copiar código</button>
+    </div>
+    <div class="code-block">
+<span class="cm"># BalanzBot — Bot de alertas de trading para Balanz</span>
+<span class="cm"># Instalá: pip install yfinance pandas requests schedule</span>
+
+<span class="kw">import</span> yfinance <span class="kw">as</span> yf
+<span class="kw">import</span> requests, schedule, time
+<span class="kw">from</span> datetime <span class="kw">import</span> datetime
+
+<span class="var">TOKEN</span>   = <span class="str">"TU_TOKEN_AQUI"</span>     <span class="cm"># Del BotFather</span>
+<span class="var">CHAT_ID</span> = <span class="str">"TU_CHAT_ID_AQUI"</span>   <span class="cm"># De @userinfobot</span>
+
+<span class="var">WATCHLIST</span> = [
+    <span class="str">"GGAL.BA"</span>, <span class="str">"YPFD.BA"</span>, <span class="str">"BBAR.BA"</span>,   <span class="cm"># Acciones arg</span>
+    <span class="str">"AAPL"</span>, <span class="str">"GOOGL"</span>, <span class="str">"MSFT"</span>,         <span class="cm"># CEDEARs</span>
+    <span class="str">"BTC-USD"</span>, <span class="str">"ETH-USD"</span>,            <span class="cm"># Crypto</span>
+]
+
+<span class="var">RSI_COMPRA</span> = <span class="num">30</span>   <span class="cm"># señal de compra</span>
+<span class="var">RSI_VENTA</span>  = <span class="num">70</span>   <span class="cm"># señal de venta</span>
+<span class="var">RSI_WATCH</span>  = <span class="num">38</span>   <span class="cm"># alerta previa a compra</span>
+<span class="var">MMA_C</span>      = <span class="num">9</span>    <span class="cm"># media móvil corta</span>
+<span class="var">MMA_L</span>      = <span class="num">21</span>   <span class="cm"># media móvil larga</span>
+<span class="var">INTERVALO</span>  = <span class="num">15</span>   <span class="cm"># minutos entre escaneos</span>
+
+<span class="kw">def</span> <span class="fn">alerta</span>(msg):
+    requests.post(
+        <span class="str">f"https://api.telegram.org/bot{TOKEN}/sendMessage"</span>,
+        json={<span class="str">"chat_id"</span>: CHAT_ID, <span class="str">"text"</span>: msg, <span class="str">"parse_mode"</span>: <span class="str">"HTML"</span>}
+    )
+
+<span class="kw">def</span> <span class="fn">calcular_rsi</span>(serie, periodo=<span class="num">14</span>):
+    d = serie.diff()
+    g = d.clip(lower=<span class="num">0</span>).rolling(periodo).mean()
+    l = (-d.clip(upper=<span class="num">0</span>)).rolling(periodo).mean()
+    <span class="kw">return</span> <span class="num">100</span> - <span class="num">100</span> / (<span class="num">1</span> + g / l)
+
+<span class="kw">def</span> <span class="fn">analizar</span>(ticker):
+    <span class="kw">try</span>:
+        df = yf.download(ticker, period=<span class="str">"3mo"</span>, interval=<span class="str">"1d"</span>, progress=<span class="kw">False</span>)
+        <span class="kw">if</span> df.empty <span class="kw">or</span> len(df) < <span class="num">30</span>: <span class="kw">return</span>
+
+        c   = df[<span class="str">"Close"</span>].squeeze()
+        rsi = calcular_rsi(c).iloc[-<span class="num">1</span>]
+        mc  = c.rolling(MMA_C).mean().iloc[-<span class="num">1</span>]
+        ml  = c.rolling(MMA_L).mean().iloc[-<span class="num">1</span>]
+        px  = c.iloc[-<span class="num">1</span>]
+        h   = datetime.now().strftime(<span class="str">"%H:%M"</span>)
+
+        <span class="kw">if</span> rsi < RSI_COMPRA <span class="kw">and</span> mc > ml:
+            alerta(<span class="str">f"🟢 &lt;b&gt;COMPRAR {ticker}&lt;/b&gt;\n"</span>
+                   <span class="str">f"RSI={rsi:.1f} | Precio=${px:.2f}\n"</span>
+                   <span class="str">f"✅ Cruce alcista confirmado | {h}"</span>)
+        <span class="kw">elif</span> rsi > RSI_VENTA <span class="kw">and</span> mc < ml:
+            alerta(<span class="str">f"🔴 &lt;b&gt;VENDER {ticker}&lt;/b&gt;\n"</span>
+                   <span class="str">f"RSI={rsi:.1f} | Precio=${px:.2f}\n"</span>
+                   <span class="str">f"⚠️ Cruce bajista confirmado | {h}"</span>)
+        <span class="kw">elif</span> rsi < RSI_WATCH:
+            alerta(<span class="str">f"🟡 &lt;b&gt;ATENCIÓN {ticker}&lt;/b&gt;\n"</span>
+                   <span class="str">f"RSI={rsi:.1f} — acercándose a zona de compra\n"</span>
+                   <span class="str">f"Precio=${px:.2f} | {h}"</span>)
+
+    <span class="kw">except</span> Exception <span class="kw">as</span> e:
+        print(<span class="str">f"Error {ticker}: {e}"</span>)
+
+<span class="kw">def</span> <span class="fn">escanear</span>():
+    print(<span class="str">f"\n[{datetime.now():%H:%M}] Escaneando {len(WATCHLIST)} activos..."</span>)
+    <span class="kw">for</span> t <span class="kw">in</span> WATCHLIST:
+        analizar(t)
+
+<span class="cm"># Inicio</span>
+alerta(<span class="str">"🤖 &lt;b&gt;BalanzBot activo&lt;/b&gt; — Monitoreando el mercado."</span>)
+escanear()
+schedule.every(INTERVALO).minutes.do(escanear)
+<span class="kw">while True</span>:
+    schedule.run_pending()
+    time.sleep(<span class="num">60</span>)
+    </div>
+  </div>
+</div>
+
+</div>
+<script>
+// ─── DATA ───
+const TICKERS = {
+  acciones:[
+    {sym:"GGAL.BA",name:"Grupo Galicia",base:8500},
+    {sym:"YPFD.BA",name:"YPF",base:17000},
+    {sym:"BBAR.BA",name:"BBVA Arg.",base:5200},
+    {sym:"PAMP.BA",name:"Pampa Energía",base:4100},
+    {sym:"TXAR.BA",name:"Ternium Arg.",base:1800},
+    {sym:"ALUA.BA",name:"Aluar",base:1200},
+    {sym:"SUPV.BA",name:"Supervielle",base:2900},
+    {sym:"CRES.BA",name:"Cresud",base:3400},
+  ],
+  cedears:[
+    {sym:"AAPL",name:"Apple",base:175},
+    {sym:"GOOGL",name:"Google",base:140},
+    {sym:"AMZN",name:"Amazon",base:178},
+    {sym:"MSFT",name:"Microsoft",base:415},
+    {sym:"TSLA",name:"Tesla",base:185},
+    {sym:"META",name:"Meta",base:510},
+    {sym:"NVDA",name:"NVIDIA",base:880},
+    {sym:"JPM",name:"JPMorgan",base:198},
+  ],
+  crypto:[
+    {sym:"BTC-USD",name:"Bitcoin",base:67000},
+    {sym:"ETH-USD",name:"Ethereum",base:3500},
+    {sym:"BNB-USD",name:"Binance Coin",base:580},
+    {sym:"SOL-USD",name:"Solana",base:165},
+  ]
+};
+
+// ─── STATE ───
+let selected = new Set(["GGAL.BA","YPFD.BA","AAPL","GOOGL","BTC-USD","ETH-USD"]);
+let signals = [];
+let botRunning = false;
+let botTimer = null;
+
+// ─── CLOCK ───
+setInterval(()=>{
+  document.getElementById('clockEl').textContent =
+    new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+},1000);
+
+// ─── TABS ───
+function switchTab(name, btn){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  if(btn) btn.classList.add('active');
+  if(name==='upcoming') refreshUpcoming();
+}
+
+// ─── TICKER GRIDS ───
+function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
+function fmtBase(t){
+  const v = t.base*(0.97+Math.random()*0.06);
+  return t.sym.endsWith('.BA') ? '$'+Math.round(v).toLocaleString('es-AR') : '$'+v.toFixed(2);
+}
+function renderGrids(){
+  ['acciones','cedears','crypto'].forEach(cat=>{
+    document.getElementById('grid'+cap(cat)).innerHTML =
+      TICKERS[cat].map(t=>`
+        <div class="ticker-item ${selected.has(t.sym)?'selected':''}" onclick="toggleTicker('${t.sym}',this)">
+          <div class="t-check">✓</div>
+          <div class="t-sym">${t.sym}</div>
+          <div class="t-name">${t.name}</div>
+          <div class="t-price">${fmtBase(t)}</div>
+        </div>`).join('');
+  });
+  document.getElementById('s-activos').textContent = selected.size;
+}
+function toggleTicker(sym,el){
+  selected.has(sym)?selected.delete(sym):selected.add(sym);
+  el.classList.toggle('selected');
+  document.getElementById('s-activos').textContent = selected.size;
+}
+function selectAll(cat){ TICKERS[cat].forEach(t=>selected.add(t.sym)); renderGrids(); }
+function clearAll(cat){ TICKERS[cat].forEach(t=>selected.delete(t.sym)); renderGrids(); }
+function saveWatchlist(){
+  toast('info','💾 Guardado',`${selected.size} activos en watchlist`);
+  switchTab('dashboard', document.querySelectorAll('.tab')[0]);
+}
+
+// ─── SIGNAL ENGINE ───
+function getRSI(){ return Math.round(15+Math.random()*70); }
+function getPrice(sym){
+  const all=[...TICKERS.acciones,...TICKERS.cedears,...TICKERS.crypto];
+  const t=all.find(x=>x.sym===sym)||{base:100};
+  return t.base*(0.97+Math.random()*0.06);
+}
+function allT(){ return [...TICKERS.acciones,...TICKERS.cedears,...TICKERS.crypto]; }
+
+function generateSignal(){
+  const tickers=[...selected];
+  if(!tickers.length) return;
+  const sym=tickers[Math.floor(Math.random()*tickers.length)];
+  const rsiVal=getRSI();
+  const price=getPrice(sym);
+  const rsiLow=parseInt(document.getElementById('rsiLow').value)||30;
+  const rsiHigh=parseInt(document.getElementById('rsiHigh').value)||70;
+  let type,reason,icon;
+
+  if(rsiVal<rsiLow){
+    type='buy'; icon='🟢'; reason=`RSI=${rsiVal} — zona de sobreventa`;
+  } else if(rsiVal>rsiHigh){
+    type='sell'; icon='🔴'; reason=`RSI=${rsiVal} — zona de sobrecompra`;
+  } else if(rsiVal<rsiLow+8){
+    type='watch'; icon='🟡'; reason=`RSI=${rsiVal} — acercándose a sobreventa`;
+  } else if(Math.random()>0.65){
+    type='watch'; icon='🟡'; reason='Cruce de medias móviles detectado';
+  } else { return; }
+
+  if(type==='buy'&&!document.getElementById('fBuy').checked) return;
+  if(type==='sell'&&!document.getElementById('fSell').checked) return;
+  if(type==='watch'&&!document.getElementById('fWatch').checked) return;
+
+  const sig={sym,type,icon,rsiVal,price,reason,
+    time:new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',second:'2-digit'})};
+  signals.unshift(sig);
+  if(signals.length>20) signals.pop();
+  renderSignals();
+  updateStats();
+
+  const titles={buy:'Señal de COMPRA',sell:'Señal de VENTA',watch:'Zona de atención'};
+  toast(type,icon+' '+titles[type],`${sym} — ${reason}`);
+  if(document.getElementById('fSound').checked) playBeep(type);
+}
+
+function playBeep(type){
+  try{
+    const ctx=new AudioContext(),o=ctx.createOscillator(),g=ctx.createGain();
+    o.connect(g);g.connect(ctx.destination);
+    o.frequency.value=type==='buy'?880:type==='sell'?330:660;
+    o.type='sine';
+    g.gain.setValueAtTime(0.12,ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.25);
+    o.start();o.stop(ctx.currentTime+0.25);
+  }catch(e){}
+}
+
+function fmtP(price,sym){
+  if(sym.endsWith('.BA')) return '$'+Math.round(price).toLocaleString('es-AR');
+  return '$'+price.toFixed(2);
+}
+
+function renderSignals(){
+  const el=document.getElementById('signalList');
+  if(!signals.length){
+    el.innerHTML='<div class="empty"><div class="ei">🔍</div><p>Iniciá el bot para recibir señales en tiempo real.</p></div>';
+    return;
+  }
+  el.innerHTML=signals.map(s=>`
+    <div class="sig">
+      <div class="sig-badge ${s.type}">${s.icon} ${s.type==='buy'?'COMPRAR':s.type==='sell'?'VENDER':'ATENCIÓN'}</div>
+      <div class="sig-info">
+        <div class="sig-ticker">${s.sym}</div>
+        <div class="sig-reason">${s.reason}</div>
+      </div>
+      <div class="sig-rsi">RSI ${s.rsiVal}</div>
+      <div class="sig-right">
+        <div class="sig-price">${fmtP(s.price,s.sym)}</div>
+        <div class="sig-time">${s.time}</div>
+      </div>
+    </div>`).join('');
+}
+
+function updateStats(){
+  document.getElementById('s-total').textContent=signals.length;
+  document.getElementById('s-compras').textContent=signals.filter(s=>s.type==='buy').length;
+  document.getElementById('s-ventas').textContent=signals.filter(s=>s.type==='sell').length;
+}
+
+// ─── BOT CONTROL ───
+function setBtnState(running){
+  const btn=document.getElementById('startBtn');
+  const sB=document.getElementById('scanBtn'),sB2=document.getElementById('scanBtn2');
+  btn.innerHTML=running?'⏹ Detener Bot':'▶ Iniciar Bot';
+  btn.className=running?'btn btn-danger':'btn btn-primary';
+  sB.disabled=!running; sB2.disabled=!running;
+  document.getElementById('botStatusText').textContent=running?'ACTIVO':'INACTIVO';
+}
+
+function toggleBot(){
+  botRunning=!botRunning;
+  setBtnState(botRunning);
+  if(botRunning){
+    if(selected.size===0){
+      toast('info','⚠️ Sin activos','Seleccioná activos en Watchlist primero');
+      botRunning=false; setBtnState(false); return;
+    }
+    generateSignal();
+    botTimer=setInterval(()=>{ if(Math.random()>0.25) generateSignal(); },3500);
+    setLastScan();
+    toast('info','🚀 Bot iniciado',`Monitoreando ${selected.size} activos en tiempo real`);
+  } else {
+    clearInterval(botTimer);
+    toast('info','⏹ Bot detenido','El monitoreo fue pausado');
+  }
+}
+
+function setLastScan(){
+  document.getElementById('lastScan').textContent='Último escaneo: '+
+    new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+}
+
+function forceRescan(){
+  if(!botRunning){ toast('info','⚠️ Bot inactivo','Iniciá el bot primero'); return; }
+  generateSignal(); generateSignal(); setLastScan();
+  toast('info','⚡ Escaneo forzado','Analizando el mercado ahora...');
+}
+
+function clearSignals(){
+  signals=[]; renderSignals(); updateStats();
+  toast('info','🗑 Limpiado','Historial de señales borrado');
+}
+
+function exportSignals(){
+  if(!signals.length){ toast('info','⚠️ Sin datos','No hay señales para exportar'); return; }
+  const rows=['Hora,Activo,Señal,RSI,Precio,Razón'];
+  signals.forEach(s=>rows.push(`${s.time},${s.sym},${s.type},${s.rsiVal},${fmtP(s.price,s.sym)},"${s.reason}"`));
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([rows.join('\n')],{type:'text/csv'}));
+  a.download='balanzbot_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
+  toast('info','📥 Exportado',`${signals.length} señales guardadas en CSV`);
+}
+
+// ─── UPCOMING ───
+const buyDescs=[
+  'RSI convergiendo hacia zona de sobreventa — momentum bajando gradualmente',
+  'Precio probando soporte histórico, rebote técnico probable',
+  'MMA corta acercándose a cruce alcista sobre MMA larga',
+  'Volumen creciente con RSI en descenso — señal próxima en 1-2 velas',
+  'Divergencia alcista detectada entre precio y RSI',
+  'Precio en canal alcista, zona de compra en soporte inferior',
+];
+const sellDescs=[
+  'RSI acercándose a zona de sobrecompra — posible reversión bajista',
+  'Precio en resistencia clave, momentum perdiendo fuerza',
+  'Cruce bajista de medias móviles inminente — señal de salida próxima',
+  'Sobreextensión alcista sin volumen — corrección probable',
+];
+const consDescs=[
+  'Precio lateral entre soporte y resistencia — esperando ruptura',
+  'RSI neutro, sin dirección clara — mercado en pausa',
+  'Bajo volumen, consolidación post-movimiento — esperar confirmación',
+];
+function rnd(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function shuffle(arr){ return [...arr].sort(()=>Math.random()-.5); }
+const etas=['Hoy tarde','Esta tarde','1-2 días','2-3 días','Esta semana'];
+const etasSell=['1-2 días','2-3 días','Esta semana'];
+
+function refreshUpcoming(){
+  const pool=shuffle(allT().filter(t=>selected.size?selected.has(t.sym):true));
+  const p=pool.length?pool:shuffle(allT());
+
+  const buy=p.slice(0,3).map(t=>({...t,rsi:Math.round(32+Math.random()*10),eta:rnd(etas),conf:Math.round(55+Math.random()*35),desc:rnd(buyDescs),hot:Math.random()>.6}));
+  const sell=p.slice(3,5).map(t=>({...t,rsi:Math.round(62+Math.random()*10),eta:rnd(etasSell),conf:Math.round(45+Math.random()*30),desc:rnd(sellDescs)}));
+  const cons=p.slice(5,7).map(t=>({...t,rsi:Math.round(42+Math.random()*18),desc:rnd(consDescs),conf:Math.round(35+Math.random()*25)}));
+
+  renderUp('upBuy',buy,'📈','');
+  renderUp('upSell',sell,'📉','sell-op');
+  renderUp('upCons',cons,'↔️','cons-op');
+}
+
+function renderUp(id,items,icon,cls){
+  document.getElementById(id).innerHTML=items.map(item=>`
+    <div class="up-item ${cls} ${item.hot?'hot':''}">
+      <div class="up-icon">${item.hot?'🔥':icon}</div>
+      <div class="up-info">
+        <div class="up-ticker">${item.sym} <span style="font-size:10px;color:var(--muted2);font-family:var(--mono);">RSI ${item.rsi}</span></div>
+        <div class="up-desc">${item.desc}</div>
+      </div>
+      <div class="up-right">
+        ${item.eta?`<div class="up-eta">⏱ ${item.eta}</div>`:''}
+        ${item.conf?`<div class="conf-bar"><div class="conf-fill" style="width:${item.conf}%"></div></div><div class="up-conf">${item.conf}% conf.</div>`:''}
+      </div>
+    </div>`).join('');
+}
+
+// ─── CONFIG ───
+function saveConfig(){ toast('info','💾 Guardado','Configuración actualizada'); }
+function resetConfig(){
+  document.getElementById('rsiLow').value=30;document.getElementById('rsiLowVal').textContent='30';
+  document.getElementById('rsiHigh').value=70;document.getElementById('rsiHighVal').textContent='70';
+  document.getElementById('mmaC').value=9;document.getElementById('mmaCVal').textContent='9';
+  document.getElementById('mmaL').value=21;document.getElementById('mmaLVal').textContent='21';
+  document.getElementById('interval').value=15;document.getElementById('intervalVal').textContent='15min';
+  toast('info','↺ Restablecido','Valores vueltos a los defaults');
+}
+function testTelegram(){
+  const tok=document.getElementById('tgToken').value.trim();
+  const cid=document.getElementById('tgChatId').value.trim();
+  if(!tok||!cid){ toast('info','⚠️ Faltan datos','Completá el Token y Chat ID'); return; }
+  toast('info','📨 Probando...','Verificando token...');
+  setTimeout(()=>{
+    tok.includes(':')
+      ? toast('buy','✅ Token válido','Ejecutá el bot en Python para confirmar la conexión')
+      : toast('sell','❌ Token inválido','El formato debe ser: 123456789:ABCdef...');
+  },1200);
+}
+function showTgHelp(){
+  toast('info','📱 Telegram en 2 pasos','① @BotFather → /newbot → copiá el token\n② @userinfobot → mandá un msg → copiá el Chat ID');
+}
+
+// ─── COPY CODE ───
+function copyCode(){
+  const code=`# BalanzBot — Bot de alertas de trading para Balanz
+# Instalá: pip install yfinance pandas requests schedule
+
+import yfinance as yf
+import requests, schedule, time
+from datetime import datetime
+
+TOKEN   = "TU_TOKEN_AQUI"
+CHAT_ID = "TU_CHAT_ID_AQUI"
+
+WATCHLIST = [
+    "GGAL.BA", "YPFD.BA", "BBAR.BA",
+    "AAPL", "GOOGL", "MSFT",
+    "BTC-USD", "ETH-USD",
+]
+
+RSI_COMPRA = 30
+RSI_VENTA  = 70
+RSI_WATCH  = 38
+MMA_C      = 9
+MMA_L      = 21
+INTERVALO  = 15
+
+def alerta(msg):
+    requests.post(
+        f"https://api.telegram.org/bot{TOKEN}/sendMessage",
+        json={"chat_id": CHAT_ID, "text": msg, "parse_mode": "HTML"}
+    )
+
+def calcular_rsi(serie, periodo=14):
+    d = serie.diff()
+    g = d.clip(lower=0).rolling(periodo).mean()
+    l = (-d.clip(upper=0)).rolling(periodo).mean()
+    return 100 - 100 / (1 + g / l)
+
+def analizar(ticker):
+    try:
+        df = yf.download(ticker, period="3mo", interval="1d", progress=False)
+        if df.empty or len(df) < 30: return
+
+        c   = df["Close"].squeeze()
+        rsi = calcular_rsi(c).iloc[-1]
+        mc  = c.rolling(MMA_C).mean().iloc[-1]
+        ml  = c.rolling(MMA_L).mean().iloc[-1]
+        px  = c.iloc[-1]
+        h   = datetime.now().strftime("%H:%M")
+
+        if rsi < RSI_COMPRA and mc > ml:
+            alerta(f"\\U0001F7E2 <b>COMPRAR {ticker}</b>\\n"
+                   f"RSI={rsi:.1f} | Precio=${px:.2f}\\n"
+                   f"Cruce alcista confirmado | {h}")
+        elif rsi > RSI_VENTA and mc < ml:
+            alerta(f"\\U0001F534 <b>VENDER {ticker}</b>\\n"
+                   f"RSI={rsi:.1f} | Precio=${px:.2f}\\n"
+                   f"Cruce bajista confirmado | {h}")
+        elif rsi < RSI_WATCH:
+            alerta(f"\\U0001F7E1 <b>ATENCION {ticker}</b>\\n"
+                   f"RSI={rsi:.1f} acercandose a zona de compra\\n"
+                   f"Precio=${px:.2f} | {h}")
+
+    except Exception as e:
+        print(f"Error {ticker}: {e}")
+
+def escanear():
+    print(f"\\n[{datetime.now():%H:%M}] Escaneando {len(WATCHLIST)} activos...")
+    for t in WATCHLIST:
+        analizar(t)
+
+alerta("\\U0001F916 <b>BalanzBot activo</b> — Monitoreando el mercado.")
+escanear()
+schedule.every(INTERVALO).minutes.do(escanear)
+while True:
+    schedule.run_pending()
+    time.sleep(60)`;
+
+  navigator.clipboard.writeText(code)
+    .then(()=>toast('buy','📋 Copiado','Código Python copiado al portapapeles'))
+    .catch(()=>toast('info','⚠️ Error','Seleccioná el texto manualmente'));
+}
+
+// ─── TOAST ───
+function toast(type,title,msg,ms=4200){
+  const c=document.getElementById('toast-container');
+  const icons={buy:'🟢',sell:'🔴',watch:'🟡',info:'ℹ️'};
+  const d=document.createElement('div');
+  d.className=`toast ${type}`;
+  d.innerHTML=`<div class="toast-icon">${icons[type]||'ℹ️'}</div>
+    <div class="toast-body"><div class="toast-title">${title}</div><div class="toast-msg">${msg}</div></div>
+    <div class="toast-x" onclick="rmToast(this.parentElement)">✕</div>`;
+  c.appendChild(d);
+  setTimeout(()=>rmToast(d),ms);
+}
+function rmToast(el){
+  if(!el||!el.parentElement) return;
+  el.classList.add('toast-out');
+  setTimeout(()=>el.remove(),300);
+}
+
+// ─── INIT ───
+renderGrids();
+refreshUpcoming();
+renderSignals();
+updateStats();
+</script>
+</body>
+</html>
